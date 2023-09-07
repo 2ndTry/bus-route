@@ -3,9 +3,10 @@ package com.alexeymirniy.bus.route.service.impl;
 import com.alexeymirniy.bus.route.service.RouteService;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.util.Arrays;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.stream.Stream;
 
 @Service
 public class RouteServiceImpl implements RouteService {
@@ -13,49 +14,39 @@ public class RouteServiceImpl implements RouteService {
     @Override
     public boolean isRoutePresent(int x, int y) {
 
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader("src/main/resources/data/route.txt"));
-            String line = reader.readLine();
+        Map<Integer, List<Integer>> routeAndStops = new HashMap<>();
 
-            while (line != null) {
+        try (Stream<String> inputDataStream = Files.lines(Path.of("src/main/resources/data/route.txt"))) {
 
-                int indexBegin = line.indexOf(" ");
-                int[] stops = Arrays
-                        .stream(line.substring(indexBegin + 1).split(" "))
-                        .mapToInt(Integer::parseInt)
-                        .toArray();
+            inputDataStream.parallel().forEach(line -> {
+                List<Integer> stops = new ArrayList<>();
+                Arrays.stream(line.split(" ")).skip(1).forEach(stop -> stops.add(Integer.parseInt(stop)));
+                routeAndStops.put(Integer.parseInt(line.split(" ")[0]), stops);
+            });
 
-                if (isRoutePresent(x, y, stops)) {
-                    reader.close();
-                    return true;
-                }
-                line = reader.readLine();
-            }
-            reader.close();
-            return false;
         } catch (Exception e) {
             System.out.println("Exception in isRoutePresent method. Exception:\n" + e.getMessage());
         }
-        return false;
+
+        return checkRoute(x, y, routeAndStops);
     }
 
-    public boolean isRoutePresent(int x, int y, int[] stops) {
+    private boolean checkRoute(int x, int y, Map<Integer, List<Integer>> routeAndStops) {
 
-        boolean resultX = false;
-        boolean resultY = false;
-        boolean isYAfterX = false;
+        boolean result = false;
 
-        for (int i : stops) {
-            if (i == x) {
-                resultX = true;
-                isYAfterX = false;
+        for (Map.Entry<Integer, List<Integer>> entry : routeAndStops.entrySet()) {
+
+            if (entry.getValue().contains(x) && entry.getValue().contains(y)) {
+                int indexX = entry.getValue().indexOf(x);
+                int indexY = entry.getValue().indexOf(y);
+                if (indexX < indexY) {
+                    result = true;
+                    break;
+                }
             }
-            if (i == y) {
-                resultY = true;
-                isYAfterX = true;
-            }
-            if (resultX && resultY && isYAfterX) return true;
         }
-        return false;
+
+        return result;
     }
 }
